@@ -1,0 +1,13 @@
+[Unit]
+Description=delayed hibernation trigger
+Before=suspend.target
+StopWhenUnneeded=true
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=suspend-to-hibernate.sh suspend
+ExecStop=suspend-to-hibernate.sh resume
+
+[Install]
+WantedBy=suspend.target

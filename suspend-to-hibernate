@@ -1,0 +1,26 @@
+#############################################
+# suspend-to-hibernate configuration file
+#############################################
+
+#############################################
+# Hardware settings
+#############################################
+
+# Path to rtc wakealarm to wake after suspends
+WAKEALARM=/sys/class/rtc/rtc0/wakealarm
+# Path to primary power supply to check if connected
+POWER=/sys/class/power_supply/AC0
+# Path to primary battery to check battery state
+BAT=/sys/class/power_supply/BAT0
+
+#############################################
+# Suspend/Hibernate timing and threshold
+#############################################
+
+# Time from suspend to immediate hibernate
+# For initial suspend if the laptop should hibernate instead
+SUSPEND_DELAY=1minute
+# Time to recheck state with rtc clock to switch from suspend to hibernate
+HIBERNATE_TIME=1hour
+# Percentage of battery that if below, go to suspend instead of hibernate
+BATTERY_THRESHOLD=0.2
