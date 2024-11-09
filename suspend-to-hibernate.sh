@@ -1,8 +1,12 @@
 #!/bin/bash
 
-exec &> >(logger -i -t suspend-to-hibernate)
+start-logger() {
+    exec &> >(logger -i -t suspend-to-hibernate)
+}
 
-source /etc/suspend-to-hibernate
+start-logger
+
+source @etc@/suspend-to-hibernate.conf
 
 # For the following
 # resuming: true iff the call is coming out of an rtc timeout
@@ -14,13 +18,12 @@ suspend-cmd() {
     local resuming=$1; shift
     local comment=$1; shift
     if $resuming; then
-	echo "resuspend triggered: $comment"
-	systemctl suspend
+	    echo "resuspend triggered: $comment"
+	    systemctl suspend
     else
-	echo "suspend triggered: $comment"
-	local alarm=$(date +%s -d+$HIBERNATE_TIME)
-	echo "alarm set for $alarm"
-	echo "$alarm" >"$WAKEALARM"
+	    local alarm=$(date +%s -d+$HIBERNATE_TIME)
+	    echo "alarm set for $alarm; +$HIBERNATE_TIME"
+	    echo "$alarm" >"$WAKEALARM"
     fi
 }
 
@@ -32,12 +35,23 @@ hibernate-cmd() {
     local resuming=$1; shift
     local comment=$1; shift
     if $resuming; then
-	echo "resuspend hibernate triggered: $comment"
-	systemctl hibernate
+	    echo "resuspend hibernate triggered: $comment"
+	    systemctl hibernate
     else
-	echo "hibernate would be triggered: $comment"
-	echo "alarm set for $alarm"
-	date +%s -d+"$SUSPEND_DELAY" >"$WAKEALARM"
+	    echo "hibernate triggered: $comment"
+	    local alarm=$(date +%s -d+$SUSPEND_DELAY)
+	    echo "alarm set for $alarm; +$SUSPEND_DELAY"
+	    echo "$alarm" >"$WAKEALARM"
+        
+        # (
+        #     start-logger
+        #     echo "sleep $SUSPEND_DELAY"
+        #     sleep $SUSPEND_DELAY
+        #     echo "hibernate starting"
+        #     systemctl hibernate
+        # ) &
+        # disown $!
+        # return -1
     fi
 }
 
@@ -49,17 +63,17 @@ choose-suspend() {
     
     local onpower=$(<$POWER/online)
     if [[ $onpower = 1 ]]; then
-	suspend-cmd $resuming "on power"
+	    suspend-cmd $resuming "on power"
     else
-	local curr=$(<$BAT/charge_now)
-	local max=$(<$BAT/charge_full)
-	local percent=$(bc -l <<< "scale=2; $curr/$max")
-	local threshold=$(bc -l <<< "scale=2; $percent > $BATTERY_THRESHOLD")
-	if [[ $threshold = 1 ]]; then
-	    suspend-cmd $resuming "over threshold ($percent; $threshold; $curr; $max)"
-	else
-	    hibernate-cmd $resuming "hibernate triggered ($percent; $threshold; $curr; $max)" 
-	fi
+	    local curr=$(<$BAT/charge_now)
+	    local max=$(<$BAT/charge_full)
+	    local percent=$(bc -l <<< "scale=2; $curr/$max")
+	    local threshold=$(bc -l <<< "scale=2; $percent > $BATTERY_THRESHOLD")
+	    if [[ $threshold = 1 ]]; then
+	        suspend-cmd $resuming "over threshold ($percent; $threshold; $curr; $max)"
+	    else
+	        hibernate-cmd $resuming "hibernate triggered ($percent; $threshold; $curr; $max)" 
+	    fi
     fi
 }
 
@@ -82,9 +96,9 @@ resume() {
     local now=$(date +%s)
     echo 0 >"$WAKEALARM"
     if [[ -z $alarm ]] || [[ "$now" -ge "$alarm" ]]; then
-	choose-suspend-resuming
+	    choose-suspend-resuming
     else
-	echo "normal wakeup"
+	    echo "normal wakeup"
     fi
 }
 
@@ -97,8 +111,8 @@ resume() {
 main() {
     local state=$1; shift
     case $state in
-	suspend) choose-suspend-suspending;;
-	resume) resume;;
+	    suspend) choose-suspend-suspending;;
+	    resume) resume;;
     esac
 }
 
