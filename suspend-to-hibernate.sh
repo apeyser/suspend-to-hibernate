@@ -81,7 +81,7 @@ choose-suspend-resuming() {
 # wakeup is triggered by alarm, and if so,
 # resuspend or hibernate
 resume() {
-    local alarm=$(cat /sys/class/rtc/"$WAKEALARM"/wakealarm)
+    local alarm=$(</sys/class/rtc/"$WAKEALARM"/wakealarm)
     echo 0 >/sys/class/rtc/"$WAKEALARM"/wakealarm
     if [[ -z $alarm ]]; then
 	    choose-suspend-resuming
