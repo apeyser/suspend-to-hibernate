@@ -1,12 +1,14 @@
 #!/bin/bash
 
-start-logger() {
-    exec &> >(logger -i -t suspend-to-hibernate)
-}
-
-start-logger
+exec &> >(logger -i -t suspend-to-hibernate)
 
 source @etc@/suspend-to-hibernate.conf
+
+rtc() {
+    local delta=$1
+    rtcwake -v -m no --date +$delta -d $WAKEALARM
+    echo "wakealarm set for +$delta"
+}
 
 # For the following
 # resuming: true iff the call is coming out of an rtc timeout
@@ -21,9 +23,8 @@ suspend-cmd() {
 	    echo "resuspend triggered: $comment"
 	    systemctl suspend
     else
-	    local alarm=$(date +%s -d+$HIBERNATE_TIME)
-	    echo "alarm set for $alarm; +$HIBERNATE_TIME"
-	    echo "$alarm" >"$WAKEALARM"
+	    echo "suspend: $comment"
+	    rtc "$HIBERNATE_TIME"
     fi
 }
 
@@ -39,19 +40,7 @@ hibernate-cmd() {
 	    systemctl hibernate
     else
 	    echo "hibernate triggered: $comment"
-	    local alarm=$(date +%s -d+$SUSPEND_DELAY)
-	    echo "alarm set for $alarm; +$SUSPEND_DELAY"
-	    echo "$alarm" >"$WAKEALARM"
-        
-        # (
-        #     start-logger
-        #     echo "sleep $SUSPEND_DELAY"
-        #     sleep $SUSPEND_DELAY
-        #     echo "hibernate starting"
-        #     systemctl hibernate
-        # ) &
-        # disown $!
-        # return -1
+	    rtc "$SUSPEND_DELAY"
     fi
 }
 
@@ -61,12 +50,12 @@ hibernate-cmd() {
 choose-suspend() {
     local resuming=$1; shift
     
-    local onpower=$(<$POWER/online)
+    local onpower=$(</sys/class/power_supply/"$POWER"/online)
     if [[ $onpower = 1 ]]; then
 	    suspend-cmd $resuming "on power"
     else
-	    local curr=$(<$BAT/charge_now)
-	    local max=$(<$BAT/charge_full)
+	    local curr=$(</sys/class/power_supply/"$BAT"/charge_now)
+	    local max=$(</sys/class/power_supply/"$BAT"/charge_full)
 	    local percent=$(bc -l <<< "scale=2; $curr/$max")
 	    local threshold=$(bc -l <<< "scale=2; $percent > $BATTERY_THRESHOLD")
 	    if [[ $threshold = 1 ]]; then
@@ -92,10 +81,9 @@ choose-suspend-resuming() {
 # wakeup is triggered by alarm, and if so,
 # resuspend or hibernate
 resume() {
-    local alarm=$(cat $WAKEALARM)
-    local now=$(date +%s)
-    echo 0 >"$WAKEALARM"
-    if [[ -z $alarm ]] || [[ "$now" -ge "$alarm" ]]; then
+    local alarm=$(cat /sys/class/rtc/"$WAKEALARM"/wakealarm)
+    echo 0 >/sys/class/rtc/"$WAKEALARM"/wakealarm
+    if [[ -z $alarm ]]; then
 	    choose-suspend-resuming
     else
 	    echo "normal wakeup"
